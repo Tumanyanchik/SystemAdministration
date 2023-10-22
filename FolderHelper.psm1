@@ -10,18 +10,19 @@ function RemoveEmptyFolders {
         [System.Collections.Generic.List[System.String]] $Exclude
     )
 
-    [System.Collections.Generic.List[System.String]] $removedFolders = `
-        [System.Collections.Generic.List[System.String]]::new()
-
     foreach ($folder in $Folders) {
         if ($folder -in $Exclude) {
             continue
         }
 
-        if (-not (Get-Item $folder).GetFileSystemInfos()) {
-            Remove-Item $folder -Force *> $null
-            $removedFolders.Add($folder)
-            $isRemoved = $true
+        $foldersForClean = GetEmptySubfolders -Folder $folder
+
+        foreach ($cleanFolder in $foldersForClean) {
+            Write-Host ("FOR CLEAN: $($cleanFolder.FullName)")
+            $removedFolders = RemoveEmptySubfolders -Folder $cleanFolder.FullName `
+                                -RootFolder $folder `
+                                -Exclude $Exclude
+            Write-Host ("WERE REMOVED: $removedFolders")
         }
     }
 
@@ -31,12 +32,57 @@ function RemoveEmptyFolders {
         }
     }
 
-    $removedFolders.Clear() 
+    if ($removedFolders) {
+        $removedFolders.Clear()
+    }
+    
+    return $Folders
+}
 
-    if ($isRemoved) {
-        $isRemoved = $false
-        $Folders = RemoveEmptyFolders -Folders $Folders -Exclude $Exclude
+function GetEmptySubfolders {
+    param (
+        [Parameter (Mandatory=$true)][String] $Folder
+    )
+   
+    if ( -not (Test-Path $Folder) -or (-not ((Get-Item $Folder).PSIsContainer)) ) {
+        Write-Warning "$Folder must be existing container"
+        return
     }
 
-    return $Folders
+    $treeSubfolders = Get-ChildItem $Folder -recurse | Where-Object { $_.PSIsContainer }
+    $emptySubfolders = $treeSubfolders | Where-Object { -not ($_.GetFileSystemInfos()) } 
+    return $emptySubfolders
+}
+
+
+function RemoveEmptySubfolders {
+    param (
+        [Parameter (Mandatory=$true)][String] $Folder,
+        [Parameter (Mandatory=$true)][String] $RootFolder,
+        [System.Collections.Generic.List[System.String]] $RemovedFolders,
+        [System.Collections.Generic.List[System.String]] $Exclude
+    )
+
+    if (-not $RemovedFolders) {
+        [System.Collections.Generic.List[System.String]] $RemovedFolders = [System.Collections.Generic.List[System.String]]::new()
+    }
+
+    if ($Folder -in $Exclude) {
+        return $RemovedFolders
+    }
+
+    if (-not (Get-Item $Folder).GetFileSystemInfos()) {
+        $parentFolder = (Get-Item $Folder).Parent.FullName
+        Remove-Item $Folder -Force *> $null
+        $RemovedFolders.Add($Folder)
+        if ($RootFolder -ne $Folder){
+            Write-Host "PARENT FOR REMOVED: $parentFolder"
+            $RemovedFolders = RemoveEmptySubfolders -Folder $parentFolder `
+                                -RootFolder $RootFolder `
+                                -RemovedFolders $RemovedFolders `
+                                -Exclude $Exclude
+        }
+    }
+
+    return $RemovedFolders
 }
