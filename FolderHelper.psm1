@@ -1,9 +1,3 @@
-<#
-    RemoveEmptyFolders - remove empty folders and return List of folders, 
-        which were not deleted from source List of folders.
-    [System.Collections.Generic.List[System.String]] $Folders - folders for cleaning;
-    [System.Collections.Generic.List[System.String]] $Exclude - folders for exclude from cleaning;
-#>
 function RemoveEmptyFolders {
     param(
         [Parameter (Mandatory=$true)] [System.Collections.Generic.List[System.String]] $Folders,
@@ -53,7 +47,6 @@ function GetEmptySubfolders {
     $emptySubfolders = $treeSubfolders | Where-Object { -not ($_.GetFileSystemInfos()) } 
     return $emptySubfolders
 }
-
 
 function RemoveEmptySubfolders {
     param (
